@@ -1,0 +1,39 @@
+<link rel="import" href="../../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../components/vaadin-room-card.html">
+
+<dom-module id="room-list">
+  <template>
+    <template is="dom-repeat" id="room-list" items="{{rooms}}" as="room">
+      <vaadin-room-card id$="room-card-[[index]]" item="[[room]]"></vaadin-room-card>
+    </template>
+  </template>
+
+  <script>
+    class RoomList extends Polymer.Element {
+      static get is() {
+        return 'room-list';
+      }
+
+      static get properties() {
+        return{
+          roomsJson: {
+            type: String,
+            observer: '_convertRoomsJson'
+          },
+          rooms : {
+            type: Array,
+            value: () => [],
+            notify: true
+          }
+        }
+      }
+
+      _convertRoomsJson(newValue, oldValue) {
+        this.rooms = JSON.parse(newValue);
+      }
+
+    }
+
+    customElements.define(RoomList.is, RoomList);
+  </script>
+</dom-module>

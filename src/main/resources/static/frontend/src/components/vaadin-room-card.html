@@ -1,0 +1,53 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/paper-card/paper-card.html">
+<link rel="import" href="../../bower_components/paper-button/paper-button.html">
+
+<dom-module id="vaadin-room-card">
+  <template>
+    <style>
+      :host {
+        display: inline-block;
+        margin: 10px;
+        padding: 10px;
+        width: 320px;
+        height: 480px;
+      }
+    </style>
+    <paper-card heading="[[item.name]]" image="[[item.imageUrl]]" alt="[[item.name]]">
+      <div class="card-content">
+        [[item.description]]
+      </div>
+      <div class="card-actions">
+        Accommodation: [[item.accommodation]] <br/>
+        Damage: [[item.damage]]
+      </div>
+      <div class="card-actions">
+        <paper-button raised class="primary" on-tap="_viewRoomDetail">View and Book</paper-button>
+      </div>
+    </paper-card>
+  </template>
+
+  <script>
+    class VaadinRoomCard extends Polymer.Element {
+
+      static get properties() {
+        return{
+          item : {
+            type: Object,
+            value: () => {},
+            notify: true
+          }
+        }
+      }
+
+      static get is() {
+        return 'vaadin-room-card'
+      }
+
+      _viewRoomDetail(){
+        window.location = '/room-detail/' + this.item.id;
+      }
+    }
+    customElements.define(VaadinRoomCard.is, VaadinRoomCard);
+  </script>
+</dom-module>

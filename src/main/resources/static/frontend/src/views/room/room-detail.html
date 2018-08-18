@@ -1,0 +1,417 @@
+<link rel="import" href="../../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../../bower_components/scheduler-component/scheduler-component.html">
+<link rel="import" href="../../../bower_components/polymer/lib/utils/render-status.html">
+<link rel="import" href="../../../bower_components/paper-toast/paper-toast.html">
+<link rel="import" href="../../../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../../bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="../../../bower_components/paper-checkbox/paper-checkbox.html">
+
+<dom-module id="room-detail">
+  <template>
+    <style>
+      .left-content {grid-area: content; padding: 15px;}
+      .right-calendar {grid-area: calendar; padding: 15px;}
+      :host {
+        display: grid;
+        grid-template-rows: auto;
+        grid-template-columns: 2fr 10px 3fr;
+        grid-template-areas: "content . calendar";
+      }
+      @media only screen and (max-width: 768px){
+        :host {
+          grid-template-columns: auto;
+          grid-template-areas: "content" "calendar";
+        }
+      }
+      h2 {
+        display: inline-block;
+      }
+      .booking-detail{
+        display: grid;
+        grid-template-rows: auto;
+        grid-template-columns: 100px auto;
+        grid-column-gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .booking-detail h4 {
+        grid-column: span 2;
+        margin-bottom: 5px;
+      }
+      .booking-detail .label{ font-weight: bold }
+
+      .booking-toast {
+        color: #333;
+        font-size: 1.2em;
+        line-height: 150%;
+        --paper-toast-background-color: #EEE;
+      }
+      #cancelCreateEventBtn, #cancelUpdateEventBtn {
+        cursor: pointer;
+        position: absolute;
+        right: 10px;
+        top: 10px;
+      }
+      #eventNameInput, #eventNameUpdateInput{
+        width: 300px;
+        margin: 15px 0;
+      }
+    </style>
+
+      <div class="left-content">
+        <h2>Room: [[room.name]]</h2> [[_getDamageText(room.damage)]]
+        <p><b>Accommodation: </b> [[room.accommodation]]</p>
+        <p><b>Description:</b> [[room.description]]</p>
+
+        <div class="booking-detail">
+          <h4>Booking Detail:</h4>
+          <span class="label">User: </span> <span>[[booking.user.name]]</span>
+          <span class="label">Title: </span> <span>[[booking.title]]</span>
+          <span class="label">Approval: </span> <span>[[_getApprovalText(booking.approval)]]</span>
+          <span class="label">Date: </span> <span>[[booking.date]]</span>
+          <span class="label">From time: </span> <span>[[booking.fromTime]]</span>
+          <span class="label">To time: </span> <span>[[booking.toTime]]</span>
+        </div>
+
+        <div style="background: url('[[room.imageUrl]]') 50% 100px no-repeat;background-size: cover; width: 100%;height: 350px;"></div>
+      </div>
+      <div class="right-calendar">
+        <scheduler-component id="calender"
+                             default-view="agendaWeek"
+                             editable week-numbers
+                             max-time="18:00:00" min-time="07:00:00"
+                             categories='[{ "label": "Approved", "color": "#1abc9c","hidden":false },
+                                { "label": "Pending", "color": "#B4BBFE","hidden":false }]'
+                             event-color="#8e44ad"
+                             text-color="#ecf0f1"
+                             events='{{data}}'
+                             header='{"center":"title","left":"prev,next,today","right":"month,agendaWeek,agendaDay"}'>
+        </scheduler-component>
+        <paper-toast id="dayClickToastStart" class="booking-toast" duration="0" text="">
+          You selected [[fromTimeClick.date]] at [[fromTimeClick.time]].<br/>
+          Please click on the same day for the end time of your booking.
+        </paper-toast>
+        <paper-toast id="dayClickToastEnd" class="booking-toast" duration="0" text="" no-cancel-on-esc-key="true">
+          Date: [[fromTimeClick.date]]<br/>
+          From: [[fromTimeClick.time]]<br/>
+          To: [[toTimeClick.time]]<br/>
+
+          <paper-input label="Enter an event name..." id="eventNameInput" autofocus="true"></paper-input>
+          <paper-button raised id="createEventBtn" on-tap="_createEvent">Create</paper-button>
+          <iron-icon id="cancelCreateEventBtn" icon="icons:remove-circle" on-click="_toggleEndToast"></iron-icon>
+        </paper-toast>
+        <paper-toast id="eventClickToast" class="booking-toast" duration="0" text="">
+          Date: [[booking.date]]<br/>
+          From: [[booking.fromTime]]<br/>
+          To: [[booking.toTime]]<br/>
+
+          <paper-input label="Enter an event name..." id="eventNameUpdateInput" autofocus="true" value="[[booking.title]]"></paper-input>
+          <paper-checkbox id="isApproveEvent">Approved</paper-checkbox><br/><br/>
+          <paper-button raised id="updateEventBtn" on-tap="_updateEvent">Update</paper-button>
+          <paper-button raised id="deleteEventBtn" on-tap="_deleteEvent">Delete</paper-button>
+          <iron-icon id="cancelUpdateEventBtn" icon="icons:remove-circle" on-click="_toggleEventToast"></iron-icon>
+        </paper-toast>
+      </div>
+
+  </template>
+
+  <script>
+    class RoomDetail extends Polymer.Element {
+      static get is() {
+        return 'room-detail';
+      }
+
+      static get properties() {
+        return{
+          room : {
+            type: Object,
+            value: () => {},
+            notify: true,
+            observer: '_updateRoomDetail'
+          },
+          data: {
+            type: Array,
+            value: () => [],
+            notify: true
+          },
+          fromTimeClick: {
+            type: Object,
+            value: () => {}
+          },
+          toTimeClick: {
+            type: Object,
+            value: () => {}
+          },
+          booking: {
+            type: Object,
+            value: () => {},
+            notify: true
+          }
+        }
+      }
+
+      ready() {
+        super.ready();
+        var cal = this.$.calender;
+        cal.addEventListener('event-resize', (e)=>this._onEventResize(e));
+        cal.addEventListener('event-drop', (e)=>this._onEventDrop(e));
+        cal.addEventListener('event-click', (e)=>this._onEventClick(e));
+        cal.addEventListener('day-click', (e)=>this._onDayClick(e));
+      }
+
+      connectedCallback() {
+        super.connectedCallback();
+        Polymer.RenderStatus.afterNextRender(this, function() {
+          this._updateSchedulerDataFromRoomDetail();
+          this._refresh();
+        });
+      }
+
+      _updateRoomDetail(newValue, oldValue) {
+        this._updateSchedulerDataFromRoomDetail();
+      }
+
+      _updateSchedulerDataFromRoomDetail(){
+        this.data = [];
+        this.room.roomBookings.forEach(r => {
+          let ev = {
+            "id": r.id,
+            "title": r.title,
+            "start" : r.date + "T" + r.fromTime + ":00",
+            "end" : r.date + "T" + r.toTime + ":00",
+            "category": r.approval === 1 ? "Approved" : "Pending"
+          };
+          this.data = this._immutablePush(this.data, ev);
+        });
+      }
+
+      _refresh() {
+        let cal = this.$.calender;
+        cal.next();
+        cal.prev();
+        this.dispatchEvent(new CustomEvent('scheduler-refresh', {detail: {"refreshed": (new Date()).getTime()}}));
+      }
+
+      _getDamageText(d) {
+        return d === 1 ? "(Damaged)" : "";
+      }
+
+      _immutablePush(arr, newEntry){
+        let v = {};
+        newEntry = Object.assign(v, newEntry);
+        return [ ...arr, newEntry ]
+      }
+
+      _onEventClick(e) {
+        this.booking = this.room.roomBookings.find(b => {return b.id === e.detail.calEvent.id});
+        console.log(this.booking);
+        this.$.isApproveEvent.checked = this.booking.approval === 1;
+        // this.$.eventClickToast.open();
+      }
+
+      _onDayClick(e){
+        let arrData = e.detail.date._i;
+        if (this.fromTimeClick === undefined || this.fromTimeClick === null) {
+          this.fromTimeClick = this._convertDayClickData(arrData);
+          this.$.dayClickToastStart.open();
+        } else {
+          this.toTimeClick = this._convertDayClickData(arrData);
+          if (this.toTimeClick.date !== this.fromTimeClick.date) {
+            this._toggleAndClearStartToast();
+          } else {
+            if (this._compareTimeInArray(this.fromTimeClick.data, this.toTimeClick.data)) {
+              this.$.dayClickToastEnd.open();
+              this.$.eventNameInput.focus();
+            } else {
+              this._toggleAndClearStartToast();
+            }
+          }
+        }
+      }
+
+      _convertDayClickData(arr) {
+        arr[1]++;
+        let copyArr = arr.slice(0);
+        for(let i = 0; i<arr.length; i++) {
+          arr[i] = this._addZeroBefore(arr[i]);;
+        }
+        let date = arr[0] + "-" + arr[1] + "-" + arr[2];
+        let time = arr[3] + ":" + arr[4] + ":" + arr[5];
+        return {
+          "date": date,
+          "time": time,
+          "data": copyArr
+        };
+      }
+
+      _addZeroBefore(n) {
+        return (n < 10) ? "0" + n : n;
+      }
+
+      /**
+       return TRUE if time of arr1 is earlier than arr2
+       */
+      _compareTimeInArray(arr1, arr2) {
+        let h1 = arr1[3];
+        let m1 = arr1[4];
+        let h2 = arr2[3];
+        let m2 = arr2[4];
+        if (h1 < h2) {
+          return true;
+        } else if(h1 === h2 && m1 < m2) {
+          return true;
+        }
+        return false;
+      }
+
+      _toggleEndToast() {
+        this.$.dayClickToastEnd.toggle();
+        this._clearBookingCache();
+      }
+      _toggleAndClearStartToast() {
+        this.$.dayClickToastStart.toggle();
+        this._clearBookingCache();
+      }
+      _toggleEventToast() {
+        this.$.eventClickToast.toggle();
+        this.booking = null;
+      }
+
+      _createEvent() {
+        let newEventForBackend = {
+          "fromTime": this.fromTimeClick.time,
+          "toTime": this.toTimeClick.time,
+          "date": this.fromTimeClick.date,
+          "title" : this.$.eventNameInput.value,
+          "approval": 0
+        };
+        this.dispatchEvent(new CustomEvent("event-create-backend", {detail: JSON.stringify(newEventForBackend)}));
+
+        let newEvent = {
+          "id": (new Date()).getTime(),
+          "title" : this.$.eventNameInput.value,
+          "start" : this.fromTimeClick.date + "T" + this.fromTimeClick.time,
+          "end" : this.toTimeClick.date + "T" + this.toTimeClick.time,
+          "approval": 0,
+          "category": "Pending"
+        };
+        this.data = this._immutablePush(this.data, newEvent);//todo: add to bookings
+        this._toggleEndToast();
+      }
+
+      _clearBookingCache(){
+        this.toTimeClick = null;
+        this.fromTimeClick = null;
+        this.$.eventNameInput.value = "";
+      }
+
+      _onEventResize(e) {
+        let selectingEvent = this.data.find(b => {return b.id === e.detail.event.id});
+        var index = this.data.indexOf(selectingEvent);
+        let objTime = this._convertDayClickData(e.detail.event.end._i);
+        selectingEvent.end = objTime.date + "T" + objTime.time;
+
+        this.data.splice(index, 1);
+        this.data = this._immutablePush(this.data, selectingEvent);
+
+        let newEvent = {
+          id: e.detail.event.id,
+          fromTime: this._getTimeFromEventTime(selectingEvent.start),
+          toTime: this._getTimeFromEventTime(selectingEvent.end),
+          date: this._getDateFromEventTime(selectingEvent.start),
+          title: selectingEvent.title,
+          approval: selectingEvent.category === "Approved" ? 1 : 0
+        };
+        this.dispatchEvent(new CustomEvent("event-update-backend", {detail: JSON.stringify(newEvent)}));
+      }
+
+      _onEventDrop(e) {
+        if(this._isTeacherUser()) {
+          location.reload();
+          return false;
+        }
+
+        let selectingEvent = this.data.find(b => {return b.id === e.detail.event.id});
+        var index = this.data.indexOf(selectingEvent);
+        this.data.splice(index, 1);
+
+        let startObj = this._convertDayClickData(e.detail.event.start._i);
+        let endObj = this._convertDayClickData(e.detail.event.end._i);
+
+        selectingEvent.start = startObj.date + "T" + startObj.time;
+        selectingEvent.end = endObj.date + "T" + endObj.time;
+
+        this.data = this._immutablePush(this.data, selectingEvent);
+
+        let newEvent = {
+          id: e.detail.event.id,
+          fromTime: startObj.time,
+          toTime: endObj.time,
+          date: startObj.date,
+          title: selectingEvent.title,
+          approval: selectingEvent.category === "Approved" ? 1 : 0
+        };
+        this.dispatchEvent(new CustomEvent("event-update-backend", {detail: JSON.stringify(newEvent)}));
+      }
+
+      _isTeacherUser() {
+        console.log(window.user, window.user.roleId);
+        return window.user.roleId === 1;
+      }
+
+      _getDateFromEventTime(t){
+        if (t === undefined) return '';
+        return t.split("T")[0];
+      }
+      _getTimeFromEventTime(t){
+        if (t === undefined) return '';
+        return t.split("T")[1];
+      }
+
+      _immutablePush(arr, newEntry){
+        let v = {};
+        newEntry = Object.assign(v, newEntry);
+        return [ ...arr, newEntry ]
+      }
+
+      _updateEvent() {
+        let selectingEvent = this.data.find(b => {return b.id === this.booking.id});
+        var index = this.data.indexOf(selectingEvent);
+        selectingEvent.title = this.$.eventNameUpdateInput.value;
+        selectingEvent.category = this.$.isApproveEvent.checked === true ? "Approved" : "Pending";
+        this.data.splice(index, 1);
+        this.data = this._immutablePush(this.data, selectingEvent);
+
+        let newEvent = {
+          id: this.booking.id,
+          fromTime: this._getTimeFromEventTime(selectingEvent.start),
+          toTime: this._getTimeFromEventTime(selectingEvent.end),
+          date: this._getDateFromEventTime(selectingEvent.start),
+          title: this.$.eventNameUpdateInput.value,
+          approval: this.$.isApproveEvent.checked === true ? 1 : 0
+        };
+        this.dispatchEvent(new CustomEvent("event-update-backend", {detail: JSON.stringify(newEvent)}));
+        this._toggleEventToast();
+      }
+
+      _deleteEvent() {
+        this.dispatchEvent(new CustomEvent("event-delete-backend", {detail: {id: this.booking.id}}));
+        console.log("delete: " + this.booking.id);
+        let selectingEvent = this.data.find(b => {return b.id === this.booking.id});
+        var index = this.data.indexOf(selectingEvent);
+        this.data.splice(index, 1);
+        let newData = [].concat(this.data);
+        this.data = newData;
+        this._toggleEventToast();
+      }
+
+      _getApprovalText(b){
+        return b ? "Yes" : "Not yet";
+      }
+
+    }
+
+    customElements.define(RoomDetail.is, RoomDetail);
+  </script>
+</dom-module>

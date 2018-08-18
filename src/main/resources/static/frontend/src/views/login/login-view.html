@@ -1,0 +1,79 @@
+<link rel="import" href="../../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../../bower_components/vaadin-text-field/vaadin-text-field.html">
+<link rel="import" href="../../../bower_components/vaadin-text-field/vaadin-password-field.html">
+<link rel="import" href="../../../bower_components/iron-form/iron-form.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+
+<dom-module id="login-view">
+
+  <template>
+
+    <style>
+      :host {
+        width: 100vw;
+        height: 80vh;
+        display: grid;
+        grid-template-columns: auto;
+        grid-template-rows: auto;
+        place-items: center;
+      }
+      .buttons {
+        width: 100%;
+        text-align: right;
+        margin-top: 15px;
+      }
+
+      paper-button {
+        height: 40px;
+      }
+
+      .demo-text{
+        margin-top: 30px;
+        color: #666666;
+        font-size: 0.9rem;
+      }
+    </style>
+
+    <div class="container">
+      <iron-form class="login" id="form" allow-redirect>
+        <form method="post" action="login" id="theform">
+          <h2>Classroom Management</h2>
+          <vaadin-text-field id="username" name="username" label="Label" value="to@test.com" on-keydown="_onInputKeydown" autofocus></vaadin-text-field>
+          <vaadin-password-field id="password" name="password" label="Password" placeholder="Enter password" on-keydown="_onInputKeydown" value="123456"></vaadin-password-field>
+
+          <div class="buttons">
+            <paper-button raised id="createEventBtn" on-tap="_login">Sign in</paper-button>
+          </div>
+        </form>
+      </iron-form>
+
+      <div class="demo-text">
+        <p><b>Demo users:</b></p>
+          Teacher account: ft@test.com - 123456<br/>
+          Operator account: to@test.com - 123456
+      </div>
+    </div>
+  </template>
+
+  <script>
+    class LoginView extends Polymer.Element {
+      static get is() {
+        return 'login-view';
+      }
+
+      _login() {
+        if (!this.$.username.invalid && !this.$.password.invalid) {
+          this.$.form.submit();
+        }
+      }
+
+      _onInputKeydown(event) {
+        if (event.key === 'Enter' || event.keyCode == 13) {
+          this._login();
+        }
+      }
+    }
+    customElements.define('login-view', LoginView);
+  </script>
+
+</dom-module>

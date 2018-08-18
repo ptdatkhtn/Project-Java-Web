@@ -1,0 +1,66 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/vaadin-tabs/src/vaadin-tabs.html">
+
+<dom-module id="app-navigation">
+  <template>
+    <style>
+      :host {
+        display: grid;
+        grid-template-rows: auto;
+        grid-template-columns: auto auto;
+        padding: 10px;
+        background-color: #DDE0FF;
+      }
+
+      .nav {
+        place-self: end;
+        text-align: right;
+      }
+      vaadin-tabs {
+        display: inline-block;
+      }
+
+      .title {
+        font-size: 1.5rem;
+        font-weight: 500;
+      }
+
+      .user-name {
+        font-weight: bold;
+        color: black;
+      }
+    </style>
+
+    <div class="title">Classroom Management</div>
+    <div class="nav">
+      <span class="user-name">[[user.name]] | </span>
+      <vaadin-tabs id="tabs"></vaadin-tabs>
+    </div>
+
+  </template>
+
+  <script>
+    class AppNavigation extends Polymer.Element {
+      static get is() {
+        return 'app-navigation';
+      }
+
+      static get properties() {
+        return {
+          user: {
+            type: Object,
+            value: () => {},
+            observer: '_updateAppUser'
+          }
+        }
+      }
+
+      _updateAppUser() {
+        window.user = this.user;
+      }
+
+    }
+
+    window.customElements.define(AppNavigation.is, AppNavigation);
+  </script>
+</dom-module>
